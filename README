@@ -1,0 +1,282 @@
+--- PROGRAMAREA CALCULATOARELOR ---
+--- TEMA 3 - TetriPic ---
+
+Cuprins:
+
+	0. Legenda..........................................Linia 22
+	1. Biblioteci si define-uri.........................Linia 28
+	2. Modularizare.....................................Linia 49
+		2.1. Fisierul "accessories.h"...................Linia 49
+		2.2. Fisierul "pieces.h"........................Linia 101
+		2.3. Fisierul "write_functions.h"...............Linia 113
+		2.4. Fisierul "support_functions.h".............Linia 146
+		2.5. Fisierul "primary_functions.h".............Linia 194
+		2.6. Sursa "source.c"...........................Linia 247
+	3. Alte detalii.....................................Linia 282
+
+--- ---------- ---
+--- 0. Legenda ---
+--- ---------- ---
+	- In acest README, o referinta  "(Linia #)" se refera strict la
+	linia # a acestui fisier README, nu a altui fisier (precum sursa).
+
+--- --------------------------- ---
+--- 1. Biblioteci si define-uri ---
+--- --------------------------- ---
+
+Folosesc:
+	<stdio.h> pentru familiile de functii 'print' si 'scan'
+	<stdlib.h> pentru functia 'atoi' din 'main' (Linia 276)
+	<string.h> pentru manipularea sirurilor de caractere - in functia
+	'erase_lines' (Linia 177)
+
+	- PIECES "OISZLJT" - un string cu toate piesele jocului
+	- MAXSIZE 34 - un numar folosit, in mare parte, pentru declararea matricelor
+	ce au legatura cu harta (precum insasi harta si piesele). Cum harta poate
+	avea o inaltime maxima de 30 fara zona alba, nu exista o matrice mai mare de
+	34 de randuri.
+	- MAXFILENAME 15 - numarul maxim de caractere pentru numele unui fisier,
+	precum 'piesa_L_270.bmp'.
+	- MAXPIECES 50 - numarul maxim de piese cu care se joaca
+	- MAXBONUSPIECES 5000 - numarul maxim de piese folosit doar la task-ul
+	'bonus'
+
+--- ----------------------------- ---
+--- 2.1. Fisierul "accessories.h" ---
+--- ----------------------------- ---
+
+Acest fisier contine functii "accesorii": functii mici ce au un scop destul de
+simplu si sunt folosite de mai multe ori.
+
+Se mai regasesc si definitiile unor structuri folosite in intreg programul,
+alaturi de declarari 'typedef' pentru a usura utilizarea lor.
+
+2.1.1. Structurile 'bmp_fileheader' si 'bmp_infoheader'
+	Toate structurile sunt definite cu 'pack(1)' pentru a grupa membrii
+	structurilor fara padding in memorie. Astfel, se faciliteaza citirea lor
+	si scrierea in fisiere binare.
+
+	Membrii acestor doua structuri 'bmp' sunt toate variabilele din header-ul
+	unui fisier '.bmp'.
+
+2.1.2. Structura 'color_struct'
+	Structura pentru utilizarea celor 3 culori de baza din cadrul unui pixel:
+	rosu, verde si albastru.
+
+2.1.3. Structura 'piece_attr'
+	Structura pentru identificarea unei piese in cadrul hartii
+		symbol - Simbolul piesei (din string-ul "OISZLJT")
+		rotation - Rotatia piesei (multiplu de 90, in [0, 270])
+		map_column - Coloana din harta pe care se afla piesa (cea mai din
+		stanga patratica a piesei)
+		matrix - Reprezentarea peisei intr-o matrice
+		rows - Inaltimea piesei
+		columns - Latimea piesei
+
+2.1.4. Functia 'new_array'
+	In esenta o functie 'malloc' ce aloca memorie pentru un vector de marime
+	'length' si testeaza succesul.
+
+2.1.5. Functia 'new_matrix'
+	Se foloseste de 'new_array' pentru a aloca memorie pentru o intreaga matrice
+	de marime 'size'.
+
+2.1.6. Functia 'free_matrix'
+	Elibereaza, in cel mai simplu mod posibil, memoria ocupata de o matrice.
+
+2.1.7. Functia 'rotate_matrix'
+	Primeste o matrice si dimensiunile ei, dupa care o roteste o singura data
+	in sens invers trigonometric si interschimba dimensiunle ei.
+
+2.1.8. Functia 'to_four'
+	O functie foarte simpla ce primeste un numar si returneaza cel mai mic
+	multiplu al lui 4 mai mare decat numarul primit. Folosit in special pentru
+	operatii ce au legatura cu padding-ul bitmap-ului.
+
+--- ------------------------ ---
+--- 2.2. Fisierul "pieces.h" ---
+--- ------------------------ ---
+
+Contine functii ce "umplu" o matrice primita ca parametru cu reprezentarea
+matriceala a piesei (definita de numele functiei). Aceste functii sunt apelate
+in cadrul functiei 'fill_piece' (Linia 199)
+
+Dupa acelasi principiu, contine o functie 'find_color' ce "umple" o structura de
+tip 'color_struct' (Linia 66) cu culoarea corespunatoare unui caracter ce
+semnifica o patratica (primita ca parametru) a unei piese sau harti.
+
+--- --------------------------------- ---
+--- 2.3. Fisierul "write_functions.h" ---
+--- --------------------------------- ---
+
+Contine functii ce au rolul de a completa o multime mare de variabile (precum
+cele din structurile 'bmp') sau de a scrie intr-un fisier.
+
+2.3.1. Functia 'write_header'
+	Primeste ca parametru doua structuri de tip 'bmp'
+	si le completeaza corespunzator. Singurele lucruri diferite la doua apeluri
+	ale acestei functii sunt variabilele 'rows' si 'columns', primite ca
+	parametru, ce schimba membri ai structurii precum 'width', 'height',
+	'biSizeImage', 'bfSize'.
+
+2.3.2. Functia 'write_to_file'
+	Primeste ca parametri fisierul in care urmeaza sa se scrie, patratica din
+	harta ce trebuie scrisa si comportamentul functiei cand scrie o patratica
+	goala '.'; anume, cand acest parametru este 0, patratica goala va fi neagra
+	(partea de jos a hartii), valoarea 1 corespunzand culorii albe (partea de
+	sus a hartii sau bordura sau fundalul unei piese - task1 si task2).
+
+2.3.3. Functia 'write_padding'
+	Calculeaza padding-ul unei linii in functie de width-ul acesteia (restul
+	impartirii numarului (30 * width) la 4) dupa care il adauga in fisierul
+	primit ca parametru.
+
+2.3.4. Functia 'write_matrix'
+	Se foloseste de cele 2 functii antepuse 'write_to_file' si 'write_padding'
+	pentru a scrie o intreaga matrice intr-un fisier. Se observa cele 2 apeluri
+	ale functii 'write_to_file' ce difera prin ultimul parametru, in functie de
+	partea hartii in care se scrie - 'irow < 4' reprezinta partea de sus a
+	hartii, unde fundalul va fi alb.
+
+--- ----------------------------------- ---
+--- 2.4. Fisierul "support_funcitons.h" ---
+--- ----------------------------------- ---
+
+Fisierul contine functii folosite de cele din "primary_functions.h" (Linia 194)
+sau folosite alaturi de acestea in task-uri (Linia 247)
+
+2.4.1. Functia 'add_border'
+	Primeste ca parametru o matrice (piesa) si ii adauga patratele goale '.' in
+	jurul ei, modificandu-i totodata dimensiunile 'rows' si 'columns'.
+
+2.4.2. Functia 'find_symbol'
+	Functie ce returneaza simbolul unei piese in functie de culoarea primita
+
+2.4.3. Functia 'collision'
+	Folosita in 'game_logic' (Linia 204) primeste ca parametri harta, inaltimea
+	ei, piesa (toate atributele ei) si nivelul pe care se afla piesa in harta.
+	Se decrementeaza nivelul antepus si se verifica daca piesa se suprapune
+	peste harta. In caz afirmativ, inseamna ca va avea loc o coliziune si
+	functia se opreste.
+	Daca s-a verificat intreaga piesa pentru suprapunere, inseamna ca ea poate
+	continua sa cada, deoarece nu va avea loc o coliziune.
+
+	In cazul in care piesa se afla la baza hartii, nu mai are rost sa se testeze
+	vreo suprapunere; se considera ca va avea loc o coliziune orice ar fi.
+
+2.4.4. Functia 'save_piece'
+	Folosita in 'game_logic' (Linia 204) primeste aceiasi parametri precum
+	functia 'collision' de mai sus. Aceasta modifica matricea 'map' prin
+	adaugarea piesei. (Functia este folosita dupa o verificare a coliziunii,
+	deci nu se pune problema unei posibile suprascrieri)
+
+2.4.5. Functia 'erase_lines'
+	Folosita in 'game_logic' (Linia 204) primeste ca argumente harta si
+	dimensiunile ei si o verifica pentru linii pline (care nu au niciun
+	caracter '.').
+	In cazul in care se gaseste o astfel de linie, se suprapune fiecare linie
+	imediat anterioara ("de deasupra ei"), iar linia cea mai de sus este
+	suprascrisa cu o linie goala.
+
+2.4.6. Functia 'check_piece'
+	Folosita in functia 'find_pieces' (Linia 234) primeste ca argumente harta,
+	coordonatele din ea in care se lucreaza, o piesa si dimensiunile piesei.
+	Functia verifica daca piesa primita se gaseste la coordonatele actuale ale
+	hartii (doar piesa propriu-zisa, nu si caracterele '.' care o inconjoara).
+	In caz afirmativ, se "sterge" piesa din harta, fiind inlocuita de caractere
+	'.'.
+
+--- --------------------------------- ---
+--- 2.5. Fisierul "primary_functions" ---
+--- --------------------------------- ---
+
+Fisierul contine functii importante ce descriu functionalitatea task-urilor.
+
+2.5.1. Functia 'fill_piece'
+	Primeste o matrice ce urmeaza a fi "umpluta" cu piesa definita de parametrul
+	'piece_id'. Aceasta functie apeleaza, conform cazului, o functie din
+	fisierul "pieces.h".
+
+2.5.2. Functia 'game_logic'
+	Contine logica jocului Tetris.
+	Trece prin fiecare piesa si "o joaca" corespunzator.
+
+	Fiecare piesa este formata (aleasa si rotita in functie de datele din
+	fisierul de input) dupa care este plasata la baza zonei albe a hartii.
+	Inainte de fiecare coborare se apeleaza functia 'collision' (Linia 159).
+
+	In cazul in care cobori in continuare, o face si se repeta ciclul.
+	In cazul in care nu mai poate cobori, se "imprima" piesa peste hartra prin
+	functia 'save_piece' (Linia 171) dupa care se verifica daca piesa s-a
+	"imprimat" peste zona alba a hartii (caz in care jocul se termina).
+
+	Daca piesa a ramas in zona neagra, se opreste instructiunea 'for'
+	corespunzatoare decrementarii variabilei 'level' pentru a se trece la piesa
+	urmatoare.
+
+	Cand s-au terminat toate piesele sau s-a iesit din functie prin
+	instructiunea 'return', harta va iesi din functie modificata.
+
+2.5.3. Functia 'fill_map'
+	Se foloseste de functiile 'fseek' si 'fread' pentru a trece prin datele unui
+	fisier de intrare primit ca parametru si a procura informatiile necesare
+	precum dimensiunile hartii si harta in sine (bitmap-ul), salvand-o in 'map'.
+
+	Cum bitmap-ul este la scala 10x10 pentru fiecare 1x1 din matrice, sunt
+	necesare unele operatii precum 'fseek' peste o valoare de 27 de bytes -
+	3 bytes care au fost cititi de cele 3 instructiuni 'fread' pana la restul de
+	30 de bytes ce reprezinta pixelul de grosime 10 si 3 culori de baza.
+
+2.5.4. Functia 'find_pieces'
+	Contine toata logica task-ului 'bonus' (Linia 272).
+	Se trece prin fiecare coordonata a hartii, unde se testeaza, pentru toate
+	piesele si toate rotatiile lor, daca vreuna se regaseste la coordonata
+	respectiva. In caz afirmativ, se tine cont de cate piese au fost gasite,
+	se salveaza intr-un vector de siruri de caractere datele ce identifica piesa
+	si se sterge din harta piesa in functie de rezultatul functiei
+	'check_piece' (Linia 185).
+
+	Dupa ce s-a trecut prin toata harta, se scriu datele obtinute in fisierul
+	primit ca parametru.
+
+--- --------------------- ---
+--- 2.6. Sursa "source.c" ---
+--- --------------------- ---
+
+2.6.1. Functia 'task1'
+	Fiecare piesa este creata intr-o matrice, careia i se adauga o bordura.
+	Se pregateste fisierul .bmp (header-ul) pentru a se scrie aceasta matrice,
+	dupa care chiar se scrie.
+
+2.6.2. Functia 'task2'
+	Acelasi principiu precum task1 cu exceptia faptului ca se creeaza fiecare
+	rotatie a pieselor inainte de a li se adauga borduri.
+
+2.6.3. Functia 'task3'
+	Incepe prin citirea si salvarea datelor din fisierul de input "cerinta3.in",
+	dupa care, pe baza lor, se executa jocul. Dupa ce jocul s-a terminat, prin
+	orice mijloc, se pregateste fisierul de output "task3.bmp" (header-ul)
+	pentru scrierea hartii dupa care aceasta se scrie cu functia 'write_matrix'
+	(Linia 138).
+
+2.6.4. Functia 'task4'
+	Acelasi principiu precum 'task3', cu exceptia faptului ca inainte de toate
+	se pregateste o harta din fisierul "cerinta4.bmp" prin functia 'fill_map'
+	(Linia 224), dupa care functia 'game_logic' (Linia 204) o primeste ca
+	parametru.
+
+2.6.5. Functia 'bonus'
+	Se citeste harta din fisierul de input "bonus.bmp" prin functia 'fill_map',
+	dupa care se executa logica task-ului bonus prin functia 'find_pieces'
+	(Linia 234).
+
+2.6.6. Functia 'main'
+	Functia 'main' se foloseste de parametrii liniei de comanda pentru a decide
+	ce task va fi executat.
+
+--- --------------- ---
+--- 3. Alte detalii ---
+--- --------------- ---
+
+Modularizarea functiei 'fill_piece' in functii 'piece_$' a fost facuta strict
+pentru a nu avea o functie mai lunga de 80 de linii.
